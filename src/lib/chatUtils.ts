@@ -1,6 +1,8 @@
+import { env } from "process"
 import type { ProcessedDataRow } from "./types/type"
 
-const OPENAI_API_KEY ="";
+const OPENAI_API_KEY =env.OPENAI_KEY_API_KEY || "your-openai-api-key-here";
+
 export async function askChatGPT(question: string, data: ProcessedDataRow[]): Promise<string> {
   try {
    
