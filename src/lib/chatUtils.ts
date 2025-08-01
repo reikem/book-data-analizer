@@ -1,11 +1,9 @@
 import type { ProcessedDataRow } from "./types/type"
 
-const OPENAI_API_KEY =
-  "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"
-
+const OPENAI_API_KEY ="";
 export async function askChatGPT(question: string, data: ProcessedDataRow[]): Promise<string> {
   try {
-    // Create data summary for context
+   
     const dataSummary = {
       totalRecords: data.length,
       companies: [...new Set(data.map((row) => row.SociedadNombre))],
