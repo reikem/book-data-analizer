@@ -3,23 +3,31 @@ import { persist } from "zustand/middleware"
 import type { ProcessedDataRow, SociedadMapping, ChartConfig, CustomWidget } from "./types/type"
 
 interface DataStore {
-
   data: ProcessedDataRow[]
   companies: string[]
-  selectedCompanies: string[]
-  sociedadMappings: SociedadMapping[]
 
+
+  selectedCompany: string | null
+
+
+  selectedCompanies: string[]
+
+  sociedadMappings: SociedadMapping[]
   dashboardTitle: string
   dashboardDescription: string
   customWidgets: CustomWidget[]
-
-
   charts: ChartConfig[]
+
 
   chatQuestions: number
 
+
   setData: (data: ProcessedDataRow[]) => void
   setCompanies: (companies: string[]) => void
+
+
+  setSelectedCompany: (company: string | null) => void
+
   setSelectedCompanies: (companies: string[]) => void
   setSociedadMappings: (mappings: SociedadMapping[]) => void
   updateDashboardInfo: (title: string, description: string) => void
@@ -33,9 +41,12 @@ interface DataStore {
 export const useDataStore = create<DataStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       data: [],
       companies: [],
+
+
+      selectedCompany: null,
+
       selectedCompanies: [],
       sociedadMappings: [],
       dashboardTitle: "Dashboard Analítico",
@@ -44,9 +55,13 @@ export const useDataStore = create<DataStore>()(
       charts: [],
       chatQuestions: 0,
 
-      // Actions
+
       setData: (data) => set({ data }),
       setCompanies: (companies) => set({ companies }),
+
+
+      setSelectedCompany: (company) => set({ selectedCompany: company }),
+
       setSelectedCompanies: (companies) => set({ selectedCompanies: companies }),
       setSociedadMappings: (mappings) => set({ sociedadMappings: mappings }),
       updateDashboardInfo: (title, description) => set({ dashboardTitle: title, dashboardDescription: description }),
@@ -59,6 +74,8 @@ export const useDataStore = create<DataStore>()(
     {
       name: "data-analytics-storage",
       partialize: (state) => ({
+
+        selectedCompany: state.selectedCompany,         
         selectedCompanies: state.selectedCompanies,
         dashboardTitle: state.dashboardTitle,
         dashboardDescription: state.dashboardDescription,
