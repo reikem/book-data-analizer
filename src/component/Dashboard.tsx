@@ -1,7 +1,7 @@
 import type React from "react"
 import { useState, useMemo } from "react"
 
-
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 
 import {
   BarChart as ReBarChart,

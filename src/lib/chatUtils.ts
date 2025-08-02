@@ -1,11 +1,18 @@
-import { env } from "process"
+// src/lib/chatUtils.ts
 import type { ProcessedDataRow } from "./types/type"
 
-const OPENAI_API_KEY =env.OPENAI_KEY_API_KEY || "your-openai-api-key-here";
+// En dev puedes usar proxy de Vite a http://localhost:3001 (ver vite.config.ts)
+// En prod usa una función serverless/endpoint y define VITE_CHAT_API_URL.
+const CHAT_API_URL =
+  import.meta.env.VITE_CHAT_API_URL?.toString() || "/api/chat"
 
-export async function askChatGPT(question: string, data: ProcessedDataRow[]): Promise<string> {
+type ChatApiResponse = { answer?: string; error?: string }
+
+export async function askChatGPT(
+  question: string,
+  data: ProcessedDataRow[],
+): Promise<string> {
   try {
-   
     const dataSummary = {
       totalRecords: data.length,
       companies: [...new Set(data.map((row) => row.SociedadNombre))],
@@ -18,43 +25,26 @@ export async function askChatGPT(question: string, data: ProcessedDataRow[]): Pr
       })),
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Llamada a tu backend (NO se usa la API key aquí)
+    const res = await fetch(CHAT_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: `Eres un asistente de análisis financiero. Tienes acceso a datos financieros con la siguiente información:
-            - Total de registros: ${dataSummary.totalRecords}
-            - Empresas: ${dataSummary.companies.join(", ")}
-            - Fuentes de datos: ${dataSummary.sources.join(", ")}
-            - Monto total: $${dataSummary.totalAmount.toLocaleString()}
-            
-            Responde en español y proporciona análisis útiles basados en los datos disponibles.`,
-          },
-          {
-            role: "user",
-            content: `${question}\n\nDatos de muestra: ${JSON.stringify(dataSummary.sampleData, null, 2)}`,
-          },
-        ],
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, dataSummary }),
     })
 
-    if (!response.ok) {
-      throw new Error(`Error de API: ${response.status}`)
+    if (!res.ok) {
+      // Devuelve análisis local si la API no responde
+      const text = await res.text().catch(() => "")
+      throw new Error(`API error ${res.status} ${text}`)
     }
 
-    const result = await response.json()
-    return result.choices[0]?.message?.content || "No se pudo obtener respuesta"
-  } catch (error) {
-    console.error("Error en ChatGPT:", error)
+    const json = (await res.json()) as ChatApiResponse
+    if (json?.answer) return json.answer
+
+    // Si el backend no trae "answer", caemos al análisis local
+    return generateLocalAnalysis(question, data)
+  } catch (err) {
+    console.error("askChatGPT fallback to local analysis:", err)
     return generateLocalAnalysis(question, data)
   }
 }
@@ -64,55 +54,56 @@ function generateLocalAnalysis(question: string, data: ProcessedDataRow[]): stri
   const uniqueCompanies = [...new Set(data.map((row) => row.SociedadNombre))].length
   const totalAmount = data.reduce((sum, row) => sum + (row.MontoEstandarizado || 0), 0)
 
-  const lowerQuestion = question.toLowerCase()
+  const lower = question.toLowerCase()
 
-  if (lowerQuestion.includes("total") || lowerQuestion.includes("suma")) {
+  if (lower.includes("total") || lower.includes("suma")) {
     return `📊 **Análisis de totales:**
 
 • **Total de registros**: ${totalRecords.toLocaleString()}
 • **Monto total**: $${totalAmount.toLocaleString()}
-• **Promedio por registro**: $${(totalAmount / totalRecords).toLocaleString()}
+• **Promedio por registro**: $${(totalAmount / Math.max(totalRecords,1)).toLocaleString()}
 • **Empresas únicas**: ${uniqueCompanies}
 
 **Distribución por empresa:**
-${[...new Set(data.map((row) => row.SociedadNombre))]
+${[...new Set(data.map((r) => r.SociedadNombre))]
   .slice(0, 5)
   .map((company) => {
-    const companyData = data.filter((row) => row.SociedadNombre === company)
-    const companyTotal = companyData.reduce((sum, row) => sum + (row.MontoEstandarizado || 0), 0)
-    return `• **${company}**: $${companyTotal.toLocaleString()} (${companyData.length} registros)`
+    const rows = data.filter((r) => r.SociedadNombre === company)
+    const sum = rows.reduce((s, r) => s + (r.MontoEstandarizado || 0), 0)
+    return `• **${company}**: $${sum.toLocaleString()} (${rows.length} registros)`
   })
   .join("\n")}
 
-*Análisis generado localmente - ChatGPT no disponible*`
+*Análisis generado localmente — Chat no disponible.*`
   }
 
-  if (lowerQuestion.includes("empresa") || lowerQuestion.includes("sociedad")) {
-    const companiesAnalysis = [...new Set(data.map((row) => row.SociedadNombre))]
+  if (lower.includes("empresa") || lower.includes("sociedad")) {
+    const lines = [...new Set(data.map((r) => r.SociedadNombre))]
       .slice(0, 10)
       .map((company) => {
-        const companyData = data.filter((row) => row.SociedadNombre === company)
-        const companyTotal = companyData.reduce((sum, row) => sum + (row.MontoEstandarizado || 0), 0)
-        return `• **${company}**: ${companyData.length} registros, $${companyTotal.toLocaleString()}`
+        const rows = data.filter((r) => r.SociedadNombre === company)
+        const sum = rows.reduce((s, r) => s + (r.MontoEstandarizado || 0), 0)
+        return `• **${company}**: ${rows.length} registros, $${sum.toLocaleString()}`
       })
       .join("\n")
 
+    const top =
+      [...new Set(data.map((r) => r.SociedadNombre))]
+        .map((name) => ({
+          name,
+          count: data.filter((r) => r.SociedadNombre === name).length,
+        }))
+        .sort((a, b) => b.count - a.count)[0]?.name ?? "-"
+
     return `🏢 **Análisis por empresas:**
 
-${companiesAnalysis}
+${lines}
 
 **Resumen:**
 - Total de empresas: ${uniqueCompanies}
-- Empresa con más registros: ${
-      [...new Set(data.map((row) => row.SociedadNombre))]
-        .map((company) => ({
-          name: company,
-          count: data.filter((row) => row.SociedadNombre === company).length,
-        }))
-        .sort((a, b) => b.count - a.count)[0]?.name
-    }
+- Empresa con más registros: ${top}
 
-*Análisis generado localmente - ChatGPT no disponible*`
+*Análisis generado localmente — Chat no disponible.*`
   }
 
   return `📊 **Resumen de datos:**
@@ -120,7 +111,7 @@ ${companiesAnalysis}
 • **Total de registros**: ${totalRecords.toLocaleString()}
 • **Empresas únicas**: ${uniqueCompanies}
 • **Monto total**: $${totalAmount.toLocaleString()}
-• **Fuentes de datos**: ${[...new Set(data.map((row) => row._source))].join(", ")}
+• **Fuentes de datos**: ${[...new Set(data.map((r) => r._source))].join(", ")}
 
 **Análisis disponible:**
 - Tendencias por empresa
@@ -128,16 +119,13 @@ ${companiesAnalysis}
 - Distribución por fuentes
 - Análisis temporal (si hay fechas)
 
-¿Te gustaría que profundice en algún aspecto específico?
+¿Deseas profundizar en algo específico?
 
-*Análisis generado localmente - ChatGPT no disponible*`
+*Análisis generado localmente — Chat no disponible.*`
 }
 
 export function formatCurrency(amount: number): string {
-  if (Math.abs(amount) >= 1000000) {
-    return `$${(amount / 1000000).toFixed(1)}M`
-  } else if (Math.abs(amount) >= 1000) {
-    return `$${(amount / 1000).toFixed(1)}K`
-  }
+  if (Math.abs(amount) >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`
+  if (Math.abs(amount) >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`
   return `$${amount.toFixed(2)}`
 }

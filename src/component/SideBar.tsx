@@ -13,8 +13,11 @@ import {
   X,
   FileSpreadsheet,
   PieChart,
+  Database,
 } from "lucide-react"
 import { useDataStore } from "@/lib/store"
+import { ThemeSelector } from "./ThemeSelector"
+
 
 interface SidebarProps {
   activeSection: string
@@ -27,48 +30,56 @@ const menuItems = [
     label: "Archivos de Ejemplo",
     icon: FileSpreadsheet,
     description: "Descargar ejemplos",
+    gradient: "from-amber-500 to-orange-500",
   },
   {
     id: "upload",
     label: "Cargar Datos",
     icon: Upload,
     description: "Subir archivos CSV",
+    gradient: "from-green-500 to-emerald-500",
   },
   {
     id: "dashboard",
     label: "Dashboard",
     icon: BarChart3,
     description: "Métricas y KPIs",
+    gradient: "from-blue-500 to-cyan-500",
   },
   {
     id: "table",
     label: "Tabla de Datos",
     icon: Table,
     description: "Explorar datos",
+    gradient: "from-purple-500 to-violet-500",
   },
   {
     id: "charts",
     label: "Generar Gráficos",
     icon: PieChart,
     description: "Crear visualizaciones",
+    gradient: "from-orange-500 to-red-500",
   },
   {
     id: "chat",
     label: "Asistente IA",
     icon: MessageSquare,
     description: "Preguntas inteligentes",
+    gradient: "from-pink-500 to-rose-500",
   },
   {
     id: "reports",
     label: "Generar Informes",
     icon: FileText,
     description: "PDF y PowerPoint",
+    gradient: "from-indigo-500 to-purple-500",
   },
   {
     id: "help",
     label: "Ayuda",
     icon: HelpCircle,
     description: "Guía de uso",
+    gradient: "from-slate-500 to-gray-500",
   },
 ]
 
@@ -76,10 +87,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { data, chatQuestions } = useDataStore()
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen)
-  }
-
+  const toggleMobileMenu = () => setIsMobileMenuOpen((s) => !s)
   const handleSectionChange = (section: string) => {
     onSectionChange(section)
     setIsMobileMenuOpen(false)
@@ -87,7 +95,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile Menu Button */}
+      {/* Botón mobile */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <Button
           variant="outline"
@@ -99,7 +107,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
         </Button>
       </div>
 
-      {/* Mobile Overlay */}
+      {/* Overlay mobile */}
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setIsMobileMenuOpen(false)} />
       )}
@@ -117,7 +125,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
           <div className="p-6 border-b border-gray-200/50 dark:border-slate-700/50">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-white" />
+                <Database className="h-6 w-6 text-white" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white">Analytics Pro</h1>
@@ -126,12 +134,12 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
             </div>
           </div>
 
-          {/* Data Status */}
+          {/* Estado de datos */}
           {data.length > 0 && (
             <div className="p-4 border-b border-gray-200/50 dark:border-slate-700/50">
               <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
                   <span className="text-sm font-medium text-green-700 dark:text-green-300">Datos cargados</span>
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-400">
@@ -141,7 +149,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
             </div>
           )}
 
-          {/* Navigation */}
+          {/* Navegación */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {menuItems.map((item) => {
               const Icon = item.icon
@@ -155,8 +163,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                   variant={isActive ? "default" : "ghost"}
                   className={cn(
                     "w-full justify-start h-auto p-3 text-left transition-all duration-200",
-                    isActive && "bg-blue-500 text-white shadow-lg",
-                    !isActive && "hover:bg-gray-100 dark:hover:bg-slate-800",
+                    isActive &&
+                      `bg-gradient-to-r ${item.gradient} text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]`,
+                    !isActive && "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300",
                     isDisabled && "opacity-50 cursor-not-allowed",
                   )}
                   onClick={() => !isDisabled && handleSectionChange(item.id)}
@@ -181,11 +190,16 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
             })}
           </nav>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-gray-200/50 dark:border-slate-700/50">
-            <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Analytics Pro v1.0</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Plataforma de análisis de datos</p>
+          {/* Footer con ThemeSelector y conteo de datos */}
+          <div className="p-4 border-t border-gray-200/50 dark:border-slate-700/50 space-y-2">
+            <ThemeSelector />
+            {data.length > 0 && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 text-center pt-1">
+                {data.length.toLocaleString()} registros cargados
+              </div>
+            )}
+            <div className="text-center pt-2">
+              <p className="text-[10px] text-gray-400 dark:text-gray-500">Analytics Pro v1.0</p>
             </div>
           </div>
         </div>

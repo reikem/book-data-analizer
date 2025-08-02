@@ -1,27 +1,27 @@
-import { useState, useEffect } from "react"
-
+import { useState } from "react"
 import { useDataStore } from "@/lib/store"
-import { ChartGenerator } from "@/component/charts/AreaaChart"
-import { ChatInterface } from "@/component/ChatInterface"
 import { CompanyMultiSelector } from "@/component/CompanyMultiSelector"
 import { Dashboard } from "@/component/Dashboard"
 import { DataUploader } from "@/component/DataUploader"
 import { DataTable } from "@/component/DateTable"
+import { ChartGenerator } from "@/component/charts/AreaaChart"
 import { ExampleFiles } from "@/component/ExampleFile"
 import { HelpGuide } from "@/component/HelpGuide"
 import { ReportGenerator } from "@/component/reportGenerator"
-import { Sidebar } from "lucide-react"
+import { useOnDataLoaded } from "@/hook/useOnDataLoaded"
+import { Sidebar } from "@/component/SideBar"
+
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState("examples")
   const { data } = useDataStore()
 
-  // Auto-switch to dashboard when data is loaded
-  useEffect(() => {
-    if (data.length > 0 && activeSection === "upload") {
+  // ✅ Cambia automáticamente a “dashboard” cuando se cargue la data
+  useOnDataLoaded(() => {
+    if (activeSection === "upload" || activeSection === "examples") {
       setActiveSection("dashboard")
     }
-  }, [data.length, activeSection])
+  })
 
   const renderContent = () => {
     switch (activeSection) {
@@ -56,7 +56,7 @@ export default function Home() {
         return (
           <div className="space-y-6">
             {data.length > 0 && <CompanyMultiSelector />}
-            <ChatInterface />
+            {/* tu ChatInterface */}
           </div>
         )
       case "help":
