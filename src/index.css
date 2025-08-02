@@ -1,59 +1,60 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* src/index.css */
 
+/* Tailwind v4 */
+@import "tailwindcss";
 
+/* (Opcional) plugin de animaciones de shadcn */
+@plugin "tailwindcss-animate";
+
+/* ---- Tokens/temas ---- */
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-
     --radius: 0.5rem;
   }
 
-  
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 84% 4.9%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
   }
 
-
   .dracula {
     --background: 232 15% 15%;
     --foreground: 0 0% 98%;
-
-    --primary: 265 89% 78%;          
+    --primary: 265 89% 78%;
     --primary-foreground: 233 16% 15%;
-
     --secondary: 232 15% 20%;
     --secondary-foreground: 0 0% 98%;
-
     --border: 232 15% 25%;
     --input: 232 15% 25%;
     --ring: 265 89% 78%;
   }
 
-  * { @apply border-border; }
   html, body, #root { width: 100%; min-height: 100%; overflow-x: hidden; }
-  body { @apply bg-background text-foreground antialiased; }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* En lugar de @apply border-border (que no existe por defecto),
+     fijamos el color por defecto de los bordes vía CSS: */
+  *, *::before, *::after { border-color: hsl(var(--border)); }
 }

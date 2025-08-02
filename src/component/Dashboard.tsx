@@ -1,12 +1,6 @@
 import type React from "react"
 import { useState, useMemo } from "react"
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { useDataStore } from "@/lib/store"
+
 
 
 import {
@@ -36,12 +30,18 @@ import {
   Download,
   Edit,
   Table as TableIcon,
+  Badge,
 } from "lucide-react"
 
-import { HeatMapChart } from "@/components/charts/heatmap-chart"
-import { exportChartAsImage } from "@/lib/chart-export"
-import { exportDashboardAsPDF } from "@/lib/report-utils"
+
 import { useToast } from "@/hook/useToast"
+import { exportChartAsImage } from "@/lib/ chartExport"
+import { HeatMapChart } from "./charts/HeatmapChart"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { useDataStore } from "@/lib/store"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@radix-ui/react-select"
 
 type WidgetSize = "small" | "medium" | "large"
 type WidgetType = "kpi" | "chart" | "table" | "list"
@@ -749,7 +749,7 @@ export function Dashboard() {
 
   const exportDashboard = async () => {
     try {
-      await exportDashboardAsPDF()
+      await exportDashboard()
       toast({ title: "Dashboard exportado", description: "El dashboard completo se ha exportado como PDF" })
     } catch {
       toast({ title: "Error al exportar", description: "No se pudo exportar el dashboard", variant: "destructive" })
