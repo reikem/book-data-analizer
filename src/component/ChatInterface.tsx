@@ -6,7 +6,17 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Send, MessageSquare, AlertCircle, Bot, User, Loader2, PlugZap } from "lucide-react"
+import {
+  Send,
+  MessageSquare,
+  AlertCircle,
+  Bot,
+  User,
+  Loader2,
+  PlugZap,
+  CheckCircle2,
+  CircleDashed,
+} from "lucide-react"
 import { useDataStore } from "@/lib/store"
 import { askChatGPT, pingChat, makeLocalSummary } from "@/lib/chatUtils"
 
@@ -27,21 +37,16 @@ export function ChatInterface() {
   const [question, setQuestion] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [remoteAvailable, setRemoteAvailable] = useState<boolean | null>(null)
-  const [checking, setChecking] = useState(false)
 
-  // Ver disponibilidad del backend/ChatGPT al montar
-  const checkConnection = async () => {
-    setChecking(true)
-    try {
-      const ok = await pingChat()
-      setRemoteAvailable(ok)
-    } finally {
-      setChecking(false)
-    }
-  }
-
+  // Ver disponibilidad del backend/ChatGPT una sola vez
   useEffect(() => {
-    checkConnection()
+    let mounted = true
+    pingChat()
+      .then((ok) => mounted && setRemoteAvailable(ok))
+      .catch(() => setRemoteAvailable(false))
+    return () => {
+      mounted = false
+    }
   }, [])
 
   // Filtro compatible con "SociedadNombre - SociedadCodigo"
@@ -58,20 +63,23 @@ export function ChatInterface() {
     })
   }, [data, selectedCompanies])
 
-  // Normalizamos la respuesta: siempre {answer, via}
+  // Normalizamos la respuesta para que SIEMPRE sea {answer, via}
+  async function askWrapper(q: string): Promise<AskResult> {
+    const res = await askChatGPT(q, filteredData)
+    if (typeof (res as any) === "string") return { answer: String(res), via: "remote" }
+    if (res && typeof (res as any).answer === "string") return res as AskResult
+    return { answer: String(res ?? ""), via: "remote" }
+  }
+
   const chatMutation = useMutation<AskResult, Error, string>({
-    mutationFn: async (q: string): Promise<AskResult> => {
-      const res = await askChatGPT(q, filteredData)
-      if (typeof res === "string") return { answer: res, via: "remote" }
-      if (res && typeof (res as any).answer === "string") return res as AskResult
-      return { answer: String(res ?? ""), via: "remote" }
-    },
+    mutationFn: askWrapper,
     onSuccess: ({ answer, via }) => {
       setMessages((prev) => prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)))
       incrementChatQuestions()
     },
-    onError: () => {
-      // Falla remoto: responder local
+    onError: (err) => {
+      // ⚠️ No cambiamos remoteAvailable aquí: el backend puede estar OK, solo falló esta request (422/401/etc)
+      console.error("askChatGPT error:", err)
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
@@ -79,7 +87,6 @@ export function ChatInterface() {
             : m,
         ),
       )
-      setRemoteAvailable(false)
     },
   })
 
@@ -99,14 +106,17 @@ export function ChatInterface() {
     setQuestion("")
 
     if (remoteAvailable) {
-      chatMutation.mutate(q) // remoto
-    } else {
-      // directo local
+      chatMutation.mutate(q) // intenta remoto
+    } else if (remoteAvailable === false) {
+      // directo a local (sin mostrar error de conexión)
       const ans = makeLocalSummary(q, filteredData)
       setMessages((prev) =>
         prev.map((m) => (m.id === newMessage.id ? { ...m, answer: ans, via: "local", isLoading: false } : m)),
       )
       incrementChatQuestions()
+    } else {
+      // remoteAvailable === null (verificando) → intenta remoto igualmente
+      chatMutation.mutate(q)
     }
   }
 
@@ -137,26 +147,28 @@ export function ChatInterface() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Estado de conexión */}
-          {remoteAvailable === null || checking ? (
+          {remoteAvailable === true && (
             <Badge variant="secondary" className="flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" /> Comprobando conexión…
+              <CheckCircle2 className="h-3 w-3" />
+              Conectado a ChatGPT
             </Badge>
-          ) : remoteAvailable ? (
-            <Badge className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-600 text-white">
-              <PlugZap className="h-3 w-3" /> Conectado a ChatGPT
+          )}
+          {remoteAvailable === null && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              <CircleDashed className="h-3 w-3" />
+              Verificando conexión…
             </Badge>
-          ) : (
-            <Badge className="flex items-center gap-1 bg-amber-600 hover:bg-amber-600 text-white">
-              <PlugZap className="h-3 w-3" /> Sin conexión (modo local)
+          )}
+          {remoteAvailable === false && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <PlugZap className="h-3 w-3" />
+              Modo local
             </Badge>
           )}
 
-          <Button variant="outline" size="sm" onClick={checkConnection} disabled={checking}>
-            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reintentar"}
-          </Button>
-
+          {/* Límite de preguntas */}
           <Badge variant="outline">{Math.max(0, 3 - chatQuestions)} preguntas restantes</Badge>
         </div>
       </div>
@@ -196,8 +208,8 @@ export function ChatInterface() {
             <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-green-700 dark:text-green-300">
-                  <Bot className="h-4 w-4" /> Respuesta{" "}
-                  {message.via ? `(${message.via === "remote" ? "ChatGPT" : "local"})` : ""}
+                  <Bot className="h-4 w-4" />
+                  Respuesta {message.via ? `(${message.via === "remote" ? "ChatGPT" : "local"})` : ""}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -208,8 +220,12 @@ export function ChatInterface() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm whitespace-pre-wrap text-green-800 dark:text-green-200">{message.answer}</p>
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-2">{message.timestamp.toLocaleString()}</p>
+                    <p className="text-sm whitespace-pre-wrap text-green-800 dark:text-green-200">
+                      {message.answer}
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                      {message.timestamp.toLocaleString()}
+                    </p>
                   </>
                 )}
               </CardContent>
@@ -250,3 +266,4 @@ export function ChatInterface() {
   )
 }
 
+export default ChatInterface
