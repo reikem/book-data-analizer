@@ -23,21 +23,14 @@ export function CompanyMultiSelector() {
     setSelectedCompanies(selectedCompanies.filter((c) => c !== company))
   }
 
-  const selectAll = () => {
-    setSelectedCompanies(companies)
-  }
+  const selectAll = () => setSelectedCompanies(companies)
+  const clearAll = () => setSelectedCompanies([])
 
-  const clearAll = () => {
-    setSelectedCompanies([])
-  }
-
-  if (companies.length === 0) {
-    return null
-  }
+  if (companies.length === 0) return null
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sociedades</label>
+      <label className="text-sm font-medium text-foreground">Sociedades</label>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>

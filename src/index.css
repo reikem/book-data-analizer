@@ -1,10 +1,16 @@
 /* src/index.css */
 @import "tailwindcss";
 
-/* Mapea tokens de color para poder usar bg-background, text-foreground, border-border, etc. */
+/* Mapeo de tokens a utilidades (bg-background, text-foreground, text-muted-foreground, etc.) */
 @theme {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
@@ -12,63 +18,126 @@
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
 
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 
-  /* Si quieres usar rounded-[--radius] también puedes definir radios aquí: */
   --radius: 0.5rem;
 }
 
-/* Variables de tus temas (light/dark/dracula). Puedes mantener exactamente las que ya tenías */
+/* --- LIGHT: Clean Light (alto contraste) --- */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* Base */
+  --background: 0 0% 100%;           /* #ffffff */
+  --foreground: 222 32% 11%;         /* #111827 -> texto principal bien negro */
 
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
+  /* Superficies */
+  --card: 210 20% 98%;               /* #f8fafc (sutilmente gris muy claro) */
+  --card-foreground: var(--foreground);
 
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--foreground);
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
+  /* Primario */
+  --primary: 226 71% 55%;            /* ~indigo-500 */
+  --primary-foreground: 0 0% 100%;
+
+  /* Secundario / acento */
+  --secondary: 210 24% 94%;          /* #e5eef8 aprox */
+  --secondary-foreground: var(--foreground);
+
+  --accent: 210 24% 94%;
+  --accent-foreground: var(--foreground);
+
+  /* Muted (textos secundarios más oscuros que antes) */
+  --muted: 210 20% 96%;              /* #edf2f7 */
+  --muted-foreground: 215 25% 27%;   /* #374151 -> gris 700 */
+
+  /* Estados */
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  /* Bordes / inputs / focus */
+  --border: 214 17% 75%;             /* #cbd5e1 -> borde visible en claro */
+  --input: 214 17% 82%;
+  --ring: 226 71% 55%;
 
   --radius: 0.5rem;
 }
 
+/* --- DARK (sin cambios grandes, mantiene buen contraste) --- */
 .dark {
-  --background: 222.2 84% 4.9%;
+  --background: 222 47% 10%;
   --foreground: 210 40% 98%;
 
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 84% 4.9%;
+  --card: 222 47% 13%;
+  --card-foreground: var(--foreground);
 
-  --secondary: 217.2 32.6% 17.5%;
+  --popover: 222 47% 13%;
+  --popover-foreground: var(--foreground);
+
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 11%;
+
+  --secondary: 217 33% 17%;
   --secondary-foreground: 210 40% 98%;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 224.3 76.3% 94.1%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 72%;
+
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 224 76% 94%;
 }
 
+/* --- DRACULA (ajuste leve) --- */
 .dracula {
   --background: 232 15% 15%;
   --foreground: 0 0% 98%;
 
+  --card: 232 15% 18%;
+  --card-foreground: var(--foreground);
+
+  --popover: 232 15% 18%;
+  --popover-foreground: var(--foreground);
+
   --primary: 265 89% 78%;
   --primary-foreground: 233 16% 15%;
 
-  --secondary: 232 15% 20%;
+  --secondary: 232 15% 22%;
   --secondary-foreground: 0 0% 98%;
+
+  --muted: 232 15% 22%;
+  --muted-foreground: 232 8% 75%;
+
+  --accent: 265 89% 78%;
+  --accent-foreground: 233 16% 15%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
 
   --border: 232 15% 25%;
   --input: 232 15% 25%;
   --ring: 265 89% 78%;
 }
-
-/* Utilidades globales que ya usabas */
-* { @apply border-border; }
+/* Base */
 html, body, #root { width: 100%; min-height: 100%; overflow-x: hidden; }
 body { @apply bg-background text-foreground antialiased; }
+
+/* Opcional: si quieres borde por defecto en elementos que lo usen */
+* { border-color: hsl(var(--border)); }

@@ -1,131 +1,97 @@
-// src/lib/chatUtils.ts
-import type { ProcessedDataRow } from "./types/type"
+export type AskResult = { answer: string; via: "remote" | "local" }
 
-// En dev puedes usar proxy de Vite a http://localhost:3001 (ver vite.config.ts)
-// En prod usa una función serverless/endpoint y define VITE_CHAT_API_URL.
-const CHAT_API_URL =
-  import.meta.env.VITE_CHAT_API_URL?.toString() || "/api/chat"
-
-type ChatApiResponse = { answer?: string; error?: string }
-
-export async function askChatGPT(
-  question: string,
-  data: ProcessedDataRow[],
-): Promise<string> {
+export async function pingChat(): Promise<boolean> {
   try {
-    const dataSummary = {
-      totalRecords: data.length,
-      companies: [...new Set(data.map((row) => row.SociedadNombre))],
-      sources: [...new Set(data.map((row) => row._source))],
-      totalAmount: data.reduce((sum, row) => sum + (row.MontoEstandarizado || 0), 0),
-      sampleData: data.slice(0, 5).map((row) => ({
-        sociedad: row.SociedadNombre,
-        monto: row.MontoEstandarizado,
-        fuente: row._source,
-      })),
-    }
-
-    // Llamada a tu backend (NO se usa la API key aquí)
-    const res = await fetch(CHAT_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, dataSummary }),
-    })
-
-    if (!res.ok) {
-      // Devuelve análisis local si la API no responde
-      const text = await res.text().catch(() => "")
-      throw new Error(`API error ${res.status} ${text}`)
-    }
-
-    const json = (await res.json()) as ChatApiResponse
-    if (json?.answer) return json.answer
-
-    // Si el backend no trae "answer", caemos al análisis local
-    return generateLocalAnalysis(question, data)
-  } catch (err) {
-    console.error("askChatGPT fallback to local analysis:", err)
-    return generateLocalAnalysis(question, data)
+    const r = await fetch("/api/health", { method: "GET" })
+    return r.ok
+  } catch {
+    return false
   }
 }
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8787"
 
-function generateLocalAnalysis(question: string, data: ProcessedDataRow[]): string {
-  const totalRecords = data.length
-  const uniqueCompanies = [...new Set(data.map((row) => row.SociedadNombre))].length
-  const totalAmount = data.reduce((sum, row) => sum + (row.MontoEstandarizado || 0), 0)
-
-  const lower = question.toLowerCase()
-
-  if (lower.includes("total") || lower.includes("suma")) {
-    return `📊 **Análisis de totales:**
-
-• **Total de registros**: ${totalRecords.toLocaleString()}
-• **Monto total**: $${totalAmount.toLocaleString()}
-• **Promedio por registro**: $${(totalAmount / Math.max(totalRecords,1)).toLocaleString()}
-• **Empresas únicas**: ${uniqueCompanies}
-
-**Distribución por empresa:**
-${[...new Set(data.map((r) => r.SociedadNombre))]
-  .slice(0, 5)
-  .map((company) => {
-    const rows = data.filter((r) => r.SociedadNombre === company)
-    const sum = rows.reduce((s, r) => s + (r.MontoEstandarizado || 0), 0)
-    return `• **${company}**: $${sum.toLocaleString()} (${rows.length} registros)`
+export async function askChatGPT(question: string, data: any[], companies?: string[]) {
+  const r = await fetch(`${API_URL}/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, data, companies }),
   })
-  .join("\n")}
-
-*Análisis generado localmente — Chat no disponible.*`
+  if (!r.ok) {
+    const text = await r.text().catch(() => "")
+    throw new Error(text || `HTTP ${r.status}`)
   }
-
-  if (lower.includes("empresa") || lower.includes("sociedad")) {
-    const lines = [...new Set(data.map((r) => r.SociedadNombre))]
-      .slice(0, 10)
-      .map((company) => {
-        const rows = data.filter((r) => r.SociedadNombre === company)
-        const sum = rows.reduce((s, r) => s + (r.MontoEstandarizado || 0), 0)
-        return `• **${company}**: ${rows.length} registros, $${sum.toLocaleString()}`
-      })
-      .join("\n")
-
-    const top =
-      [...new Set(data.map((r) => r.SociedadNombre))]
-        .map((name) => ({
-          name,
-          count: data.filter((r) => r.SociedadNombre === name).length,
-        }))
-        .sort((a, b) => b.count - a.count)[0]?.name ?? "-"
-
-    return `🏢 **Análisis por empresas:**
-
-${lines}
-
-**Resumen:**
-- Total de empresas: ${uniqueCompanies}
-- Empresa con más registros: ${top}
-
-*Análisis generado localmente — Chat no disponible.*`
-  }
-
-  return `📊 **Resumen de datos:**
-
-• **Total de registros**: ${totalRecords.toLocaleString()}
-• **Empresas únicas**: ${uniqueCompanies}
-• **Monto total**: $${totalAmount.toLocaleString()}
-• **Fuentes de datos**: ${[...new Set(data.map((r) => r._source))].join(", ")}
-
-**Análisis disponible:**
-- Tendencias por empresa
-- Comparativas de montos
-- Distribución por fuentes
-- Análisis temporal (si hay fechas)
-
-¿Deseas profundizar en algo específico?
-
-*Análisis generado localmente — Chat no disponible.*`
+  const json = await r.json()
+  return json.answer as string
+}
+// --------- Resumen local muy simple (ajusta a tu gusto) ----------
+function num(v: any) {
+  if (typeof v === "number") return v
+  const s = String(v ?? "").replace(/\./g, "").replace(",", ".")
+  const n = Number(s)
+  return Number.isFinite(n) ? n : 0
 }
 
-export function formatCurrency(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`
-  if (Math.abs(amount) >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`
-  return `$${amount.toFixed(2)}`
+function getAmount(row: Record<string, any>) {
+  const keys = ["MontoEstandarizado", "monto", "Importe en ML", "Importe ML", "Importe", "amount"]
+  for (const k of keys) {
+    if (k in row) return num(row[k])
+  }
+  return 0
+}
+
+export function makeLocalSummary(question: string, rows: any[]): string {
+  if (!rows?.length) return "No hay datos para resumir."
+
+  const companies = new Set<string>()
+  let total = 0
+  const byMonth = new Map<string, { total: number; count: number }>()
+  const byCompany = new Map<string, number>()
+
+  rows.slice(0, 2000).forEach((r) => {
+    const name = (r.SociedadNombre ?? r.Sociedad ?? r["Soc."] ?? "").toString()
+    const code = (r.SociedadCodigo ?? r.codigo ?? "").toString()
+    const display = name || code || "Sin sociedad"
+    companies.add(display)
+
+    const month = (r.Mes ?? r.mes ?? "Sin mes").toString()
+    const amt = getAmount(r)
+    total += amt
+
+    const m = byMonth.get(month) ?? { total: 0, count: 0 }
+    m.total += amt
+    m.count += 1
+    byMonth.set(month, m)
+
+    byCompany.set(display, (byCompany.get(display) ?? 0) + Math.abs(amt))
+  })
+
+  const avg = total / rows.length
+  const topCompanies = [...byCompany.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, val]) => `• ${name}: $${Math.round(val).toLocaleString()}`)
+    .join("\n")
+
+  const months = [...byMonth.entries()]
+    .sort((a, b) => (a[0] > b[0] ? 1 : -1))
+    .slice(0, 6)
+    .map(([m, d]) => `• ${m}: total $${Math.round(d.total).toLocaleString()} (${d.count} registros)`)
+    .join("\n")
+
+  return [
+    "📝 *Resumen local* (sin conexión a ChatGPT):",
+    `• Registros: ${rows.length.toLocaleString()}`,
+    `• Sociedades: ${companies.size}`,
+    `• Monto total: $${Math.round(total).toLocaleString()}`,
+    `• Promedio por registro: $${Math.round(avg).toLocaleString()}`,
+    "",
+    "Top sociedades por monto absoluto:",
+    topCompanies || "• (no disponible)",
+    "",
+    "Tendencia por mes (muestra):",
+    months || "• (no disponible)",
+    "",
+    "Pregunta recibida:",
+    `“${question}”`,
+  ].join("\n")
 }
