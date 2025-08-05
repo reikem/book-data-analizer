@@ -27,16 +27,21 @@ export function ChatInterface() {
   const [question, setQuestion] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [remoteAvailable, setRemoteAvailable] = useState<boolean | null>(null)
+  const [checking, setChecking] = useState(false)
 
-  // Ver disponibilidad del backend/ChatGPT una sola vez
-  useEffect(() => {
-    let mounted = true
-    pingChat()
-      .then((ok) => mounted && setRemoteAvailable(ok))
-      .catch(() => setRemoteAvailable(false))
-    return () => {
-      mounted = false
+  // Ver disponibilidad del backend/ChatGPT al montar
+  const checkConnection = async () => {
+    setChecking(true)
+    try {
+      const ok = await pingChat()
+      setRemoteAvailable(ok)
+    } finally {
+      setChecking(false)
     }
+  }
+
+  useEffect(() => {
+    checkConnection()
   }, [])
 
   // Filtro compatible con "SociedadNombre - SociedadCodigo"
@@ -53,40 +58,28 @@ export function ChatInterface() {
     })
   }, [data, selectedCompanies])
 
-  // Normalizamos la respuesta para que SIEMPRE sea {answer, via:"remote"}
+  // Normalizamos la respuesta: siempre {answer, via}
   const chatMutation = useMutation<AskResult, Error, string>({
     mutationFn: async (q: string): Promise<AskResult> => {
       const res = await askChatGPT(q, filteredData)
-      // Si askChatGPT devuelve string, lo envolvemos
-      if (typeof res === "string") {
-        return { answer: res, via: "remote" }
-      }
-      // Si ya devuelve {answer,...}, lo respetamos
-      if (res && typeof (res as any).answer === "string") {
-        return res as AskResult
-      }
-      // Fallback por seguridad
+      if (typeof res === "string") return { answer: res, via: "remote" }
+      if (res && typeof (res as any).answer === "string") return res as AskResult
       return { answer: String(res ?? ""), via: "remote" }
     },
-    onSuccess: (result) => {
-      const { answer, via } = result
+    onSuccess: ({ answer, via }) => {
       setMessages((prev) => prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)))
       incrementChatQuestions()
     },
     onError: () => {
-      // Si falla remoto, hacemos resumen local
+      // Falla remoto: responder local
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
-            ? {
-                ...m,
-                answer: makeLocalSummary(m.question, filteredData),
-                via: "local",
-                isLoading: false,
-              }
+            ? { ...m, answer: makeLocalSummary(m.question, filteredData), via: "local", isLoading: false }
             : m,
         ),
       )
+      setRemoteAvailable(false)
     },
   })
 
@@ -106,9 +99,9 @@ export function ChatInterface() {
     setQuestion("")
 
     if (remoteAvailable) {
-      chatMutation.mutate(q) // intenta remoto
+      chatMutation.mutate(q) // remoto
     } else {
-      // directo a local (sin mostrar error de conexión)
+      // directo local
       const ans = makeLocalSummary(q, filteredData)
       setMessages((prev) =>
         prev.map((m) => (m.id === newMessage.id ? { ...m, answer: ans, via: "local", isLoading: false } : m)),
@@ -145,11 +138,25 @@ export function ChatInterface() {
         </div>
 
         <div className="flex items-center gap-3">
-          {remoteAvailable === false && (
+          {/* Estado de conexión */}
+          {remoteAvailable === null || checking ? (
             <Badge variant="secondary" className="flex items-center gap-1">
-              <PlugZap className="h-3 w-3" /> Modo local
+              <Loader2 className="h-3 w-3 animate-spin" /> Comprobando conexión…
+            </Badge>
+          ) : remoteAvailable ? (
+            <Badge className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-600 text-white">
+              <PlugZap className="h-3 w-3" /> Conectado a ChatGPT
+            </Badge>
+          ) : (
+            <Badge className="flex items-center gap-1 bg-amber-600 hover:bg-amber-600 text-white">
+              <PlugZap className="h-3 w-3" /> Sin conexión (modo local)
             </Badge>
           )}
+
+          <Button variant="outline" size="sm" onClick={checkConnection} disabled={checking}>
+            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reintentar"}
+          </Button>
+
           <Badge variant="outline">{Math.max(0, 3 - chatQuestions)} preguntas restantes</Badge>
         </div>
       </div>
@@ -242,3 +249,4 @@ export function ChatInterface() {
     </div>
   )
 }
+
