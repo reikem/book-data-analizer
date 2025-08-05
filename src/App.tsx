@@ -1,14 +1,11 @@
+import { Routes, Route, Navigate } from "react-router-dom"
+import Home from "./pages/page" 
 
-import Home from './pages/page'
-
-function App() {
-
+export default function App() {
   return (
-    <>
-<Home />
- 
-    </>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
-
-export default App
