@@ -16,7 +16,7 @@ import {
     title: string
   }
   
-  export function LineChart({ data, xKey, yKey, title }: LineChartProps) {
+  export function LineChart({ data, xKey, yKey }: LineChartProps) {
     return (
       <div className="w-full h-96">
         <ResponsiveContainer width="100%" height="100%">

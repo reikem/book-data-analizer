@@ -1,4 +1,4 @@
-export function parseCSV(csvText: string, filename: string): any[] {
+export function parseCSV(csvText: string): any[] {
     const lines = csvText.trim().split("\n")
     if (lines.length < 2) return []
   

@@ -17,7 +17,7 @@ import {
     title: string
   }
   
-  export function ComposedChart({ data, xKey, yKey, title }: ComposedChartProps) {
+  export function ComposedChart({ data, xKey, yKey }: ComposedChartProps) {
     return (
       <div className="w-full h-96">
         <ResponsiveContainer width="100%" height="100%">

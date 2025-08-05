@@ -4,7 +4,7 @@ import { Sun, Moon, Monitor, Palette } from "lucide-react"
 import { useTheme, useIsMounted } from "@/lib/ThemeProvider"
 
 export function ThemeSelector() {
-  const { theme, setTheme, resolved } = useTheme()
+  const { theme, setTheme } = useTheme()
   const mounted = useIsMounted()
 
   const themes = [

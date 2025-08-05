@@ -8,7 +8,7 @@ interface WaterfallChartProps {
 export function WaterfallChart({ data }: WaterfallChartProps) {
   const waterfallData = useMemo(() => {
     let cumulative = 0
-    return data.slice(0, 10).map((item, index) => {
+    return data.slice(0, 10).map((item,) => {
       const value = Object.values(item)[1] as number
       const start = cumulative
       cumulative += value

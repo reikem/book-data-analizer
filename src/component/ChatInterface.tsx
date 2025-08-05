@@ -10,13 +10,16 @@ import { Send, MessageSquare, AlertCircle, Bot, User, Loader2, PlugZap } from "l
 import { useDataStore } from "@/lib/store"
 import { askChatGPT, pingChat, makeLocalSummary } from "@/lib/chatUtils"
 
+type Via = "remote" | "local"
+type AskResult = { answer: string; via: Via }
+
 interface ChatMessage {
   id: string
   question: string
   answer: string
   timestamp: Date
   isLoading?: boolean
-  via?: "remote" | "local"
+  via?: Via
 }
 
 export function ChatInterface() {
@@ -25,10 +28,12 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [remoteAvailable, setRemoteAvailable] = useState<boolean | null>(null)
 
-  // pingear disponibilidad una vez
+  // Ver disponibilidad del backend/ChatGPT una sola vez
   useEffect(() => {
     let mounted = true
-    pingChat().then((ok) => mounted && setRemoteAvailable(ok)).catch(() => setRemoteAvailable(false))
+    pingChat()
+      .then((ok) => mounted && setRemoteAvailable(ok))
+      .catch(() => setRemoteAvailable(false))
     return () => {
       mounted = false
     }
@@ -48,15 +53,28 @@ export function ChatInterface() {
     })
   }, [data, selectedCompanies])
 
-  const chatMutation = useMutation({
-    mutationFn: (q: string) => askChatGPT(q, filteredData),
-    onSuccess: ({ answer, via }) => {
-      setMessages((prev) =>
-        prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)),
-      )
+  // Normalizamos la respuesta para que SIEMPRE sea {answer, via:"remote"}
+  const chatMutation = useMutation<AskResult, Error, string>({
+    mutationFn: async (q: string): Promise<AskResult> => {
+      const res = await askChatGPT(q, filteredData)
+      // Si askChatGPT devuelve string, lo envolvemos
+      if (typeof res === "string") {
+        return { answer: res, via: "remote" }
+      }
+      // Si ya devuelve {answer,...}, lo respetamos
+      if (res && typeof (res as any).answer === "string") {
+        return res as AskResult
+      }
+      // Fallback por seguridad
+      return { answer: String(res ?? ""), via: "remote" }
+    },
+    onSuccess: (result) => {
+      const { answer, via } = result
+      setMessages((prev) => prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)))
       incrementChatQuestions()
     },
     onError: () => {
+      // Si falla remoto, hacemos resumen local
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
@@ -88,9 +106,9 @@ export function ChatInterface() {
     setQuestion("")
 
     if (remoteAvailable) {
-      chatMutation.mutate(q) // intenta OpenAI
+      chatMutation.mutate(q) // intenta remoto
     } else {
-      // modo local directo (no mostramos “no conectado”, solo resumimos)
+      // directo a local (sin mostrar error de conexión)
       const ans = makeLocalSummary(q, filteredData)
       setMessages((prev) =>
         prev.map((m) => (m.id === newMessage.id ? { ...m, answer: ans, via: "local", isLoading: false } : m)),
@@ -120,7 +138,9 @@ export function ChatInterface() {
             Asistente IA
           </h1>
           <p className="text-muted-foreground">
-            {remoteAvailable === false ? "Modo local (resumen sobre tus datos)" : "Haz preguntas inteligentes sobre tus datos"}
+            {remoteAvailable === false
+              ? "Modo local (resumen sobre tus datos)"
+              : "Haz preguntas inteligentes sobre tus datos"}
           </p>
         </div>
 
@@ -130,9 +150,7 @@ export function ChatInterface() {
               <PlugZap className="h-3 w-3" /> Modo local
             </Badge>
           )}
-          <Badge variant="outline">
-            {Math.max(0, 3 - chatQuestions)} preguntas restantes
-          </Badge>
+          <Badge variant="outline">{Math.max(0, 3 - chatQuestions)} preguntas restantes</Badge>
         </div>
       </div>
 
@@ -155,7 +173,7 @@ export function ChatInterface() {
       <div className="space-y-4 max-h-96 overflow-y-auto">
         {messages.map((message) => (
           <div key={message.id} className="space-y-3">
-            {/* Usuario */}
+            {/* Pregunta */}
             <Card className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-blue-700 dark:text-blue-300">
@@ -171,7 +189,8 @@ export function ChatInterface() {
             <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-green-700 dark:text-green-300">
-                  <Bot className="h-4 w-4" /> Respuesta {message.via ? `(${message.via === "remote" ? "ChatGPT" : "local"})` : ""}
+                  <Bot className="h-4 w-4" /> Respuesta{" "}
+                  {message.via ? `(${message.via === "remote" ? "ChatGPT" : "local"})` : ""}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -183,9 +202,7 @@ export function ChatInterface() {
                 ) : (
                   <>
                     <p className="text-sm whitespace-pre-wrap text-green-800 dark:text-green-200">{message.answer}</p>
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                      {message.timestamp.toLocaleString()}
-                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2">{message.timestamp.toLocaleString()}</p>
                   </>
                 )}
               </CardContent>
@@ -210,7 +227,14 @@ export function ChatInterface() {
               disabled={!question.trim() || chatQuestions >= 3 || chatMutation.isPending}
               className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
             >
-              {chatMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Send className="h-4 w-4 mr-2" />Enviar</>)}
+              {chatMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Enviar
+                </>
+              )}
             </Button>
           </form>
         </CardContent>

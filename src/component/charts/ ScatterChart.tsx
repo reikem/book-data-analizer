@@ -16,7 +16,7 @@ import {
     title: string
   }
   
-  export function ScatterChart({ data, xKey, yKey, title }: ScatterChartProps) {
+  export function ScatterChart({ data, xKey, yKey }: ScatterChartProps) {
     return (
       <div className="w-full h-96">
         <ResponsiveContainer width="100%" height="100%">

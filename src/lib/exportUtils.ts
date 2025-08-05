@@ -1,6 +1,7 @@
 import html2canvas from "html2canvas"
 import jsPDF from "jspdf"
 import type { ProcessedDataRow, ChartConfig, ExportOptions } from "./types/type"
+import { title } from "process"
 
 export function exportToCSV(data: any[], filename: string) {
   if (data.length === 0) return
@@ -85,6 +86,7 @@ export async function exportToPDF(
   charts: ChartConfig[],
   options: ExportOptions,
 ): Promise<void> {
+  const title = options.title || "Informe Financiero"
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -94,7 +96,8 @@ export async function exportToPDF(
   // Title
   pdf.setFontSize(20)
   pdf.setFont("helvetica", "bold")
-  pdf.text(options.title, margin, yPosition)
+
+  pdf.text(title, margin, yPosition)
   yPosition += 15
 
   // Executive Summary
@@ -230,7 +233,7 @@ export async function exportToPDF(
   }
 
   // Save PDF
-  pdf.save(`${options.title.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`)
+  pdf.save(`${title.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`)
 }
 
 export async function exportToPPTX(
@@ -276,7 +279,7 @@ export async function exportToPPTX(
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
-  link.download = `${options.title.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pptx`
+  link.download = `${title.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.ppt`
   link.click()
   URL.revokeObjectURL(url)
 }

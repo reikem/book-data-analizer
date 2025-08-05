@@ -13,7 +13,7 @@ import { ChatInterface } from "@/component/ChatInterface"
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState("examples")
-  const { data } = useDataStore()
+  const {  } = useDataStore()
 
   useOnDataLoaded(() => {
     if (activeSection === "upload" || activeSection === "examples") {

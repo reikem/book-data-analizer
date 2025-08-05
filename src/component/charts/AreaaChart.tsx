@@ -4,27 +4,30 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Download,  Plus } from "lucide-react"
+import { Download, Plus } from "lucide-react"
 import { useDataStore } from "@/lib/store"
-import { exportChartAsImage } from "@/lib/ chartExport"
 import { KPICard } from "./KpiCard"
 import { MultiFieldChart } from "./MultiFieldChart"
 import { ProfitabilityChart } from "./ProfitabilityChart"
 import { LineChart } from "./LineChart"
+import type { ChartConfig as ChartCfgType, ChartType } from "@/lib/types/type"
+import { exportChartAsImage } from "@/lib/ chartExport"
 
-
-interface ChartConfig {
-  id: string
-  type: string
-  title: string
-  xAxis: string
-  yAxis: string
-  description: string
+// Utilidad robusta para convertir strings con símbolos a número
+const toNumber = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null
+  if (typeof v === "number" && Number.isFinite(v)) return v
+  if (typeof v === "string") {
+    const n = Number.parseFloat(v.replace(/[^\d.-]/g, ""))
+    return Number.isFinite(n) ? n : null
+  }
+  return null
 }
 
 export function ChartGenerator() {
   const { data, selectedCompanies, charts, addChart } = useDataStore()
-  const [chartType, setChartType] = useState("line")
+
+  const [chartType, setChartType] = useState<ChartType>("line")
   const [chartTitle, setChartTitle] = useState("")
   const [xAxis, setXAxis] = useState("")
   const [yAxis, setYAxis] = useState("")
@@ -33,11 +36,11 @@ export function ChartGenerator() {
   const filteredData = useMemo(() => {
     if (selectedCompanies.length === 0) return data
     return data.filter((row) => {
-      const companyDisplay = `${row.SociedadNombre} - ${row.SociedadCodigo}`
+      const companyDisplay = `${row.SociedadNombre ?? ""} - ${row.SociedadCodigo ?? ""}`.trim()
       return (
         selectedCompanies.includes(companyDisplay) ||
-        selectedCompanies.includes(row.SociedadCodigo) ||
-        selectedCompanies.includes(row.SociedadNombre)
+        (row.SociedadCodigo && selectedCompanies.includes(String(row.SociedadCodigo))) ||
+        (row.SociedadNombre && selectedCompanies.includes(String(row.SociedadNombre)))
       )
     })
   }, [data, selectedCompanies])
@@ -52,21 +55,14 @@ export function ChartGenerator() {
   const numericColumns = useMemo(() => {
     return columns.filter((col) => {
       const sample = filteredData.slice(0, 10)
-      return sample.some((row) => {
-        const value = row[col]
-        if (typeof value === "string") {
-          const numValue = Number.parseFloat(value.replace(/[^\d.-]/g, ""))
-          return !isNaN(numValue)
-        }
-        return !isNaN(Number.parseFloat(value)) && isFinite(value)
-      })
+      return sample.some((row) => toNumber(row[col]) !== null)
     })
   }, [columns, filteredData])
 
   const createChart = () => {
     if (!chartTitle || !xAxis) return
 
-    const newChart: ChartConfig = {
+    const newChart: ChartCfgType = {
       id: Date.now().toString(),
       type: chartType,
       title: chartTitle,
@@ -84,7 +80,7 @@ export function ChartGenerator() {
     setDescription("")
   }
 
-  const renderChart = (chart: ChartConfig) => {
+  const renderChart = (chart: ChartCfgType) => {
     const commonProps = {
       data: filteredData,
       xKey: chart.xAxis,
@@ -97,8 +93,10 @@ export function ChartGenerator() {
         return <MultiFieldChart {...commonProps} type="line" availableFields={numericColumns} />
       case "bar":
         return <MultiFieldChart {...commonProps} type="bar" availableFields={numericColumns} />
-      case "kpi":
-        return <KPICard data={filteredData} metric={chart.yAxis || numericColumns[0]} />
+      case "kpi": {
+        const metric = chart.yAxis || numericColumns[0]
+        return <KPICard data={filteredData} metric={metric} />
+      }
       case "profitability":
         return <ProfitabilityChart data={filteredData} />
       default:
@@ -120,7 +118,7 @@ export function ChartGenerator() {
         <p className="text-gray-600 dark:text-gray-400">Crea visualizaciones interactivas con múltiples campos</p>
       </div>
 
-      {/* Chart Creation Form */}
+      {/* Formulario de creación */}
       <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Crear Nuevo Gráfico</CardTitle>
@@ -129,7 +127,7 @@ export function ChartGenerator() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="chart-type">Tipo de Gráfico</Label>
-              <Select value={chartType} onValueChange={setChartType}>
+              <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -169,14 +167,32 @@ export function ChartGenerator() {
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="description">Descripción (opcional)</Label>
-            <Input
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descripción del gráfico"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="y-axis">Eje Y (opcional para multi-series/KPI)</Label>
+              <Select value={yAxis} onValueChange={setYAxis}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar métrica" />
+                </SelectTrigger>
+                <SelectContent>
+                  {numericColumns.map((col) => (
+                    <SelectItem key={col} value={col}>
+                      {col}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Descripción (opcional)</Label>
+              <Input
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descripción del gráfico"
+              />
+            </div>
           </div>
 
           <Button onClick={createChart} disabled={!chartTitle || !xAxis}>
@@ -186,7 +202,7 @@ export function ChartGenerator() {
         </CardContent>
       </Card>
 
-      {/* Generated Charts */}
+      {/* Gráficos generados */}
       {charts.length > 0 && (
         <div className="space-y-6">
           <h3 className="text-lg font-semibold">Gráficos Generados</h3>

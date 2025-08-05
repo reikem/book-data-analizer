@@ -16,7 +16,7 @@ import {
     title: string
   }
   
-  export function BarChart({ data, xKey, yKey, title }: BarChartProps) {
+  export function BarChart({ data, xKey, yKey }: BarChartProps) {
     return (
       <div className="w-full h-96">
         <ResponsiveContainer width="100%" height="100%">
