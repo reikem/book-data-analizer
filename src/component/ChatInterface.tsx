@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Send, MessageSquare, AlertCircle, Bot, User, Loader2, PlugZap } from "lucide-react"
 import { useDataStore } from "@/lib/store"
 import { askChatGPT, pingChat, makeLocalSummary } from "@/lib/chatUtils"
+import { useToast } from "@/hook/useToast"
+
 
 type Via = "remote" | "local"
 type AskResult = { answer: string; via: Via }
@@ -27,8 +29,9 @@ export function ChatInterface() {
   const [question, setQuestion] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [remoteAvailable, setRemoteAvailable] = useState<boolean | null>(null) // null: verificando
+  const { toast } = useToast()
 
-  // Ver disponibilidad del backend/ChatGPT una vez
+  // Verificar disponibilidad del backend/ChatGPT una vez
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -62,31 +65,30 @@ export function ChatInterface() {
   const chatMutation = useMutation<AskResult, unknown, string>({
     mutationFn: async (q: string): Promise<AskResult> => {
       const res = await askChatGPT(q, filteredData)
-      // Si askChatGPT devolviera string por alguna razón, lo envolvemos
-      if (typeof res === "string") {
-        return { answer: res, via: "remote" }
-      }
-      if (res && typeof (res as any).answer === "string") {
-        return res as AskResult
-      }
+      if (typeof res === "string") return { answer: res, via: "remote" }
+      if (res && typeof (res as any).answer === "string") return res as AskResult
       return { answer: String(res ?? ""), via: "remote" }
     },
     onSuccess: ({ answer, via }) => {
       setMessages((prev) => prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)))
       incrementChatQuestions()
-      // Si llegó respuesta, consideramos conectado
       setRemoteAvailable(true)
     },
     onError: (err: unknown) => {
-      // Extraemos status si lo adjuntó askChatGPT
+      // Extraer status si lo adjunta askChatGPT
       const status = (err as any)?.status as number | undefined
       const msg = String((err as any)?.message ?? err ?? "")
       const isAuth = status === 401 || msg.toLowerCase().includes("invalid_api_key")
 
       if (isAuth) {
-        // El backend respondió pero con clave inválida/faltante.
-        // No caemos a local para no ocultar el problema de configuración.
-        setRemoteAvailable(true) // servidor alcanzable
+        // Servidor alcanzable, pero clave inválida/faltante.
+        setRemoteAvailable(true)
+        toast({
+          title: "No autorizado (401)",
+          description:
+            "Revisa la variable OPENAI_API_KEY en Vercel (Settings → Environment Variables) y vuelve a desplegar.",
+          variant: "destructive",
+        })
         setMessages((prev) =>
           prev.map((m) =>
             m.isLoading
@@ -103,8 +105,13 @@ export function ChatInterface() {
         return
       }
 
-      // Otros errores (CORS, red, 5xx): mostramos fallback local
+      // Otros errores (CORS, red, 5xx): fallback local + toast informativo
       setRemoteAvailable(false)
+      toast({
+        title: "Conexión con ChatGPT no disponible",
+        description:
+          "Usaremos un resumen local como respaldo. Revisa que la API esté accesible y los permisos CORS estén configurados.",
+      })
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
