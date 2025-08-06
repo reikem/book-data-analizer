@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800px" height="800px" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Escudo de fondo (inspirado en tu ejemplo) -->
+  <path d="M30.39,7.08l-14-6c-0.25-0.11-0.53-0.11-0.78,0l-14,6C1.24,7.24,1,7.6,1,8c0,0.15,0.07,9.9,4.25,16.66c0.41,0.67,0.86,1.31,1.36,1.91C8.79,29.18,11.81,31,16,31s7.21-1.82,9.39-4.43c0.5-0.6,0.95-1.24,1.36-1.91C30.93,17.9,31,8.15,31,8C31,7.6,30.76,7.24,30.39,7.08z" fill="#2196F3"/>
+  
+  <!-- Parte inferior del escudo -->
+  <path d="M26.75,24.66c-0.41,0.67-0.86,1.31-1.36,1.91C23.21,29.18,20.19,31,16,31s-7.21-1.82-9.39-4.43c-0.5-0.6-0.95-1.24-1.36-1.91C7.22,20.71,11.3,18,16,18S24.78,20.71,26.75,24.66z" fill="#3F51B5"/>
+  
+  <!-- Hermanos en el centro -->
+  <g transform="translate(8, 6)">
+    <!-- Hermano mayor (brazo extendido) -->
+    <circle cx="8" cy="6" r="3" fill="#FFC107"/> <!-- Cabeza -->
+    <rect x="6" y="9" width="4" height="6" fill="#4CAF50"/> <!-- Cuerpo -->
+    <rect x="4" y="9" width="2" height="4" fill="#4CAF50"/> <!-- Brazo izquierdo (protegiendo) -->
+    <rect x="10" y="9" width="2" height="4" fill="#4CAF50"/> <!-- Brazo derecho -->
+    <rect x="7" y="15" width="2" height="4" fill="#FF9800"/> <!-- Pierna izquierda -->
+    <rect x="9" y="15" width="2" height="4" fill="#FF9800"/> <!-- Pierna derecha -->
+    
+    <!-- Hermanita pequeña (detrás del brazo protector) -->
+    <circle cx="4" cy="8" r="2" fill="#FF80AB"/> <!-- Cabeza -->
+    <rect x="3" y="10" width="2" height="4" fill="#9C27B0"/> <!-- Cuerpo -->
+    <rect x="2" y="10" width="1" height="3" fill="#9C27B0"/> <!-- Brazo izquierdo -->
+    <rect x="5" y="10" width="1" height="3" fill="#9C27B0"/> <!-- Brazo derecho -->
+    <rect x="3" y="14" width="1" height="3" fill="#7E57C2"/> <!-- Pierna izquierda -->
+    <rect x="4" y="14" width="1" height="3" fill="#7E57C2"/> <!-- Pierna derecha -->
+  </g>
+  
+
+  <path d="M16,2.5L30,8v0.5H2V8L16,2.5z" fill="#BBDEFB" opacity="0.6"/>
+
+</svg>
