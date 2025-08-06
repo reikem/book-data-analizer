@@ -18,7 +18,8 @@ import {
   CircleDashed,
 } from "lucide-react"
 import { useDataStore } from "@/lib/store"
-import { askChatGPT, pingChat, makeLocalSummary } from "@/lib/chatUtils"
+import { askChatGPT, makeLocalSummary, pingChat
+ } from "@/lib/chatUtils"
 
 type Via = "remote" | "local"
 type AskResult = { answer: string; via: Via }
