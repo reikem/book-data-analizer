@@ -1,5 +1,5 @@
-import type React from "react"
 import { useEffect, useMemo, useState } from "react"
+import type { FormEvent } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,6 @@ import { Send, MessageSquare, AlertCircle, Bot, User, Loader2, PlugZap } from "l
 import { useDataStore } from "@/lib/store"
 import { askChatGPT, pingChat, makeLocalSummary } from "@/lib/chatUtils"
 import { useToast } from "@/hook/useToast"
-
 
 type Via = "remote" | "local"
 type AskResult = { answer: string; via: Via }
@@ -75,13 +74,12 @@ export function ChatInterface() {
       setRemoteAvailable(true)
     },
     onError: (err: unknown) => {
-      // Extraer status si lo adjunta askChatGPT
       const status = (err as any)?.status as number | undefined
       const msg = String((err as any)?.message ?? err ?? "")
       const isAuth = status === 401 || msg.toLowerCase().includes("invalid_api_key")
 
       if (isAuth) {
-        // Servidor alcanzable, pero clave inválida/faltante.
+        // Servidor alcanzable, pero clave inválida/faltante
         setRemoteAvailable(true)
         toast({
           title: "No autorizado (401)",
@@ -127,7 +125,7 @@ export function ChatInterface() {
     },
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     const q = question.trim()
     if (!q || chatQuestions >= 3 || chatMutation.isPending) return
