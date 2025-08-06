@@ -2,9 +2,13 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "https://book-data-analizer-ap
 
 export type AskResult = { answer: string; via: "remote" };
 
-export async function askChatGPT(question: string, dataSample: any[], companies?: string[]): Promise<AskResult> {
+export async function askChatGPT(
+  question: string,
+  dataSample: any[],
+  companies?: string[]
+): Promise<AskResult> {
   const r = await fetch(`${API_BASE}/api/ask`, {
-    method: "POST",
+    method: "POST",                // <-- IMPORTANTE
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, data: dataSample, companies }),
   });
@@ -15,7 +19,7 @@ export async function askChatGPT(question: string, dataSample: any[], companies?
 
 export async function pingChat(): Promise<boolean> {
   try {
-    const r = await fetch(`${API_BASE}/api/ping`, { method: "GET" });
+    const r = await fetch(`${API_BASE}/api/ping`, { method: "GET" });  // <-- ping a /api/ping
     return r.ok;
   } catch {
     return false;
