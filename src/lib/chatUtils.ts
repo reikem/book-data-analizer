@@ -1,9 +1,7 @@
 // src/lib/chatUtils.ts
 export type AskResult = { answer: string; via: "remote" }
 
-// Usa VITE_API_URL si la defines en el front; si no, cae al dominio de tu API en Vercel
-const API_BASE =
-  (import.meta as any).env?.VITE_API_URL ?? "https://book-data-analizer-api.vercel.app"
+const API_BASE = import.meta.env.VITE_API_URL ?? "https://book-data-analizer-api.vercel.app";
 const ASK_URL = `${API_BASE}/api/ask`
 const PING_URL = `${API_BASE}/api/ping`
 
@@ -21,34 +19,19 @@ export async function pingChat(): Promise<boolean> {
 }
 
 /** Envía pregunta al backend (POST /api/ask). Lanza Error con .status cuando no es 2xx. */
-export async function askChatGPT(question: string, dataSample: any[]): Promise<AskResult> {
-  // recorta muestra para no enviar todo
-  const sample = (dataSample ?? [])
-    .slice(0, 150)
-    .map((row: Record<string, unknown>) => {
-      const out: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(row)) {
-        out[k] = typeof v === "string" ? v.slice(0, 120) : v
-      }
-      return out
-    })
-
-  const r = await fetch(ASK_URL, {
+export async function askChatGPT(question: string, data: any[], companies?: string[]) {
+  const r = await fetch(`${API_BASE}/api/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, data: sample }),
-  })
-
+    body: JSON.stringify({ question, data, companies }),
+  });
   if (!r.ok) {
-    const text = await r.text().catch(() => "")
-    const err = new Error(text || `HTTP ${r.status}`)
-    ;(err as any).status = r.status
-    throw err
+    const t = await r.text();
+    const err: any = new Error(t);
+    err.status = r.status;
+    throw err;
   }
-
-  const j = await r.json().catch(() => ({}))
-  const answer = j?.answer ?? ""
-  return { answer, via: "remote" }
+  return (await r.json()) as { answer: string; via: "remote" };
 }
 
 /** Resumen local cuando no hay ChatGPT (conteos + estadísticas rápidas). */
