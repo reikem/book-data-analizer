@@ -2,7 +2,6 @@
 export type AskResult = { answer: string; via: "remote" }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://book-data-analizer-api.vercel.app";
-const ASK_URL = `${API_BASE}/api/ask`
 const PING_URL = `${API_BASE}/api/ping`
 
 /** Verifica si el backend está respondiendo. */
