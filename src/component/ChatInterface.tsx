@@ -6,20 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import {
-  Send,
-  MessageSquare,
-  AlertCircle,
-  Bot,
-  User,
-  Loader2,
-  PlugZap,
-  CheckCircle2,
-  CircleDashed,
-} from "lucide-react"
+import { Send, MessageSquare, AlertCircle, Bot, User, Loader2, PlugZap } from "lucide-react"
 import { useDataStore } from "@/lib/store"
-import { askChatGPT, makeLocalSummary, pingChat
- } from "@/lib/chatUtils"
+import { askChatGPT, pingChat, makeLocalSummary } from "@/lib/chatUtils"
 
 type Via = "remote" | "local"
 type AskResult = { answer: string; via: Via }
@@ -37,21 +26,19 @@ export function ChatInterface() {
   const { data, selectedCompanies, chatQuestions, incrementChatQuestions } = useDataStore()
   const [question, setQuestion] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [remoteAvailable, setRemoteAvailable] = useState<boolean | null>(null)
+  const [remoteAvailable, setRemoteAvailable] = useState<boolean | null>(null) // null: verificando
 
-  // Ver disponibilidad del backend/ChatGPT una sola vez
+  // Ver disponibilidad del backend/ChatGPT una vez
   useEffect(() => {
     let mounted = true
-    console.log("[Chat] pingChat: iniciando verificación…")
-    pingChat()
-      .then((ok) => {
-        console.log("[Chat] pingChat: resultado =", ok)
+    ;(async () => {
+      try {
+        const ok = await pingChat()
         if (mounted) setRemoteAvailable(ok)
-      })
-      .catch((err) => {
-        console.log("[Chat] pingChat: error =", err)
-        setRemoteAvailable(false)
-      })
+      } catch {
+        if (mounted) setRemoteAvailable(false)
+      }
+    })()
     return () => {
       mounted = false
     }
@@ -61,7 +48,7 @@ export function ChatInterface() {
   const filteredData = useMemo(() => {
     if (!data?.length) return []
     if (!selectedCompanies?.length) return data
-    const out = data.filter((row) => {
+    return data.filter((row) => {
       const display = `${row.SociedadNombre ?? ""} - ${row.SociedadCodigo ?? ""}`.trim()
       return (
         (display && selectedCompanies.includes(display)) ||
@@ -69,43 +56,55 @@ export function ChatInterface() {
         (row.SociedadNombre && selectedCompanies.includes(String(row.SociedadNombre)))
       )
     })
-    return out
   }, [data, selectedCompanies])
 
-  // Normalizamos la respuesta para que SIEMPRE sea {answer, via}
-  async function askWrapper(q: string): Promise<AskResult> {
-    console.log("[Chat] askWrapper → enviando pregunta REMOTA:", {
-      question: q,
-      filteredRows: filteredData.length,
-      selectedCompanies,
-    })
-    const res = await askChatGPT(q, filteredData)
-    console.log("[Chat] askWrapper ← respuesta cruda de askChatGPT:", res)
-
-    if (typeof (res as any) === "string") {
-      const wrapped = { answer: String(res), via: "remote" as const }
-      console.log("[Chat] askWrapper: respuesta envuelta (string → objeto):", wrapped)
-      return wrapped
-    }
-    if (res && typeof (res as any).answer === "string") {
-      console.log("[Chat] askWrapper: respuesta ya normalizada:", res)
-      return res as AskResult
-    }
-    const fallback = { answer: String(res ?? ""), via: "remote" as const }
-    console.log("[Chat] askWrapper: respuesta atípica, fallback normalizado:", fallback)
-    return fallback
-  }
-
-  const chatMutation = useMutation<AskResult, Error, string>({
-    mutationFn: askWrapper,
+  // Mutación normalizada: garantizamos {answer, via:"remote"} si el backend responde OK
+  const chatMutation = useMutation<AskResult, unknown, string>({
+    mutationFn: async (q: string): Promise<AskResult> => {
+      const res = await askChatGPT(q, filteredData)
+      // Si askChatGPT devolviera string por alguna razón, lo envolvemos
+      if (typeof res === "string") {
+        return { answer: res, via: "remote" }
+      }
+      if (res && typeof (res as any).answer === "string") {
+        return res as AskResult
+      }
+      return { answer: String(res ?? ""), via: "remote" }
+    },
     onSuccess: ({ answer, via }) => {
-      console.log("[Chat] onSuccess:", { via, answerPreview: answer.slice(0, 120) })
       setMessages((prev) => prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)))
       incrementChatQuestions()
+      // Si llegó respuesta, consideramos conectado
+      setRemoteAvailable(true)
     },
-    onError: (err) => {
-      // ⚠️ No cambiamos remoteAvailable aquí: el backend puede estar OK, solo falló esta request (422/401/etc)
-      console.error("[Chat] onError (remoto):", err)
+    onError: (err: unknown) => {
+      // Extraemos status si lo adjuntó askChatGPT
+      const status = (err as any)?.status as number | undefined
+      const msg = String((err as any)?.message ?? err ?? "")
+      const isAuth = status === 401 || msg.toLowerCase().includes("invalid_api_key")
+
+      if (isAuth) {
+        // El backend respondió pero con clave inválida/faltante.
+        // No caemos a local para no ocultar el problema de configuración.
+        setRemoteAvailable(true) // servidor alcanzable
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isLoading
+              ? {
+                  ...m,
+                  answer:
+                    "⚠️ El servidor respondió 401: revisa la variable OPENAI_API_KEY en Vercel (Settings → Environment Variables) y vuelve a desplegar.",
+                  via: undefined,
+                  isLoading: false,
+                }
+              : m,
+          ),
+        )
+        return
+      }
+
+      // Otros errores (CORS, red, 5xx): mostramos fallback local
+      setRemoteAvailable(false)
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
@@ -118,7 +117,6 @@ export function ChatInterface() {
             : m,
         ),
       )
-      console.log("[Chat] onError: generado resumen local como fallback.")
     },
   })
 
@@ -126,13 +124,6 @@ export function ChatInterface() {
     e.preventDefault()
     const q = question.trim()
     if (!q || chatQuestions >= 3 || chatMutation.isPending) return
-
-    console.log("[Chat] handleSubmit:", {
-      question: q,
-      mode: remoteAvailable === false ? "local" : remoteAvailable === true ? "remoto" : "verificando/remoto",
-      filteredRows: filteredData.length,
-      selectedCompanies,
-    })
 
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -144,19 +135,16 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, newMessage])
     setQuestion("")
 
-    if (remoteAvailable) {
-      chatMutation.mutate(q) // intenta remoto
-    } else if (remoteAvailable === false) {
-      // directo a local (sin mostrar error de conexión)
+    // Intentamos remoto si no sabemos aún (null) o si está disponible (true)
+    if (remoteAvailable !== false) {
+      chatMutation.mutate(q)
+    } else {
+      // Modo local directo si ya sabemos que no hay remoto
       const ans = makeLocalSummary(q, filteredData)
-      console.log("[Chat] Modo local directo: respuesta generada localmente:", ans)
       setMessages((prev) =>
         prev.map((m) => (m.id === newMessage.id ? { ...m, answer: ans, via: "local", isLoading: false } : m)),
       )
       incrementChatQuestions()
-    } else {
-      // remoteAvailable === null (verificando) → intenta remoto igualmente
-      chatMutation.mutate(q)
     }
   }
 
@@ -171,6 +159,21 @@ export function ChatInterface() {
       </div>
     )
   }
+
+  const connectionBadge =
+    remoteAvailable === null ? (
+      <Badge variant="secondary" className="flex items-center gap-1">
+        <Loader2 className="h-3 w-3 animate-spin" /> Verificando…
+      </Badge>
+    ) : remoteAvailable === true ? (
+      <Badge variant="secondary" className="flex items-center gap-1">
+        <PlugZap className="h-3 w-3" /> Conectado a ChatGPT
+      </Badge>
+    ) : (
+      <Badge variant="secondary" className="flex items-center gap-1">
+        <PlugZap className="h-3 w-3" /> Modo local
+      </Badge>
+    )
 
   return (
     <div className="space-y-6">
@@ -187,28 +190,8 @@ export function ChatInterface() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Estado de conexión */}
-          {remoteAvailable === true && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              Conectado a ChatGPT
-            </Badge>
-          )}
-          {remoteAvailable === null && (
-            <Badge variant="outline" className="flex items-center gap-1">
-              <CircleDashed className="h-3 w-3" />
-              Verificando conexión…
-            </Badge>
-          )}
-          {remoteAvailable === false && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <PlugZap className="h-3 w-3" />
-              Modo local
-            </Badge>
-          )}
-
-          {/* Límite de preguntas */}
+        <div className="flex items-center gap-3">
+          {connectionBadge}
           <Badge variant="outline">{Math.max(0, 3 - chatQuestions)} preguntas restantes</Badge>
         </div>
       </div>
@@ -248,8 +231,8 @@ export function ChatInterface() {
             <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-green-700 dark:text-green-300">
-                  <Bot className="h-4 w-4" />
-                  Respuesta {message.via ? `(${message.via === "remote" ? "ChatGPT" : "local"})` : ""}
+                  <Bot className="h-4 w-4" /> Respuesta{" "}
+                  {message.via ? `(${message.via === "remote" ? "ChatGPT" : "local"})` : ""}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -260,9 +243,7 @@ export function ChatInterface() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm whitespace-pre-wrap text-green-800 dark:text-green-200">
-                      {message.answer}
-                    </p>
+                    <p className="text-sm whitespace-pre-wrap text-green-800 dark:text-green-200">{message.answer}</p>
                     <p className="text-xs text-green-600 dark:text-green-400 mt-2">
                       {message.timestamp.toLocaleString()}
                     </p>
@@ -305,5 +286,3 @@ export function ChatInterface() {
     </div>
   )
 }
-
-export default ChatInterface

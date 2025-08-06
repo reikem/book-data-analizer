@@ -1,74 +1,38 @@
-// src/lib/chatUtils.ts
+// lib/chatUtils.ts
 export type Via = "remote" | "local"
 export type AskResult = { answer: string; via: Via }
 
-// Preferimos tomar la URL del backend desde env (Vite) y dejamos un fallback a tu API en Vercel
-const API_BASE =
-  import.meta.env.VITE_API_BASE?.toString().replace(/\/+$/, "") ||
-  "https://book-data-analizer-api.vercel.app"
+const API_BASE = "https://book-data-analizer-api.vercel.app"
 
-/** Ping: verifica si el backend está arriba y accesible (CORS incluido) */
+export async function askChatGPT(question: string, dataSample: any[]): Promise<AskResult> {
+  const r = await fetch(`${API_BASE}/api/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, data: dataSample, companies: [] }),
+  })
+
+  if (!r.ok) {
+    const body = await r.text()
+    const err = new Error(body) as any
+    err.status = r.status // 👈 adjuntamos el status
+    throw err
+  }
+
+  const json = await r.json()
+  const answer = json?.answer ?? "Sin respuesta."
+  return { answer, via: "remote" }
+}
+
 export async function pingChat(): Promise<boolean> {
   try {
-    const r = await fetch(`${API_BASE}/api/ping`, {
-      method: "GET",
-      mode: "cors",
-    })
+    const r = await fetch(`${API_BASE}/api/ping`, { method: "GET" })
     return r.ok
   } catch {
     return false
   }
 }
 
-/** Pregunta al backend /api/ask (remoto). Lanza error si la API falla. */
-export async function askChatGPT(
-  question: string,
-  dataSample: any[],
-  companies?: string[],
-): Promise<AskResult> {
-  const payload = {
-    question,
-    // manda una muestra limitada para no exceder tamaño
-    data: Array.isArray(dataSample) ? dataSample.slice(0, 200) : [],
-    companies: companies ?? [],
-  }
-
-  const res = await fetch(`${API_BASE}/api/ask`, {
-    method: "POST",
-    mode: "cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  })
-
-  if (!res.ok) {
-    // Propaga el error para que ChatInterface haga fallback local
-    const text = await res.text().catch(() => "")
-    throw new Error(text || `Remote error: ${res.status}`)
-  }
-
-  const json = await res.json().catch(() => ({}))
-  const answer: string = json?.answer ?? ""
-  return { answer, via: "remote" }
-}
-
-/** Resumen local de emergencia cuando el backend no está disponible */
 export function makeLocalSummary(q: string, data: any[]): string {
-  const rows = Array.isArray(data) ? data : []
-  const cols = rows.length ? Object.keys(rows[0]) : []
-  const n = rows.length
-
-  const companies = new Set<string>()
-  for (const r of rows) {
-    const name = (r?.SociedadNombre ?? r?.Sociedad ?? "").toString().trim()
-    if (name) companies.add(name)
-    if (companies.size >= 5) break
-  }
-
-  return [
-    "Resumen local:",
-    `- Registros: ${n}`,
-    `- Columnas: ${cols.length}`,
-    `- Sociedades (ej.): ${Array.from(companies).join(", ") || "N/A"}`,
-    `- Pregunta: ${q}`,
-  ].join("\n")
+  const cols = data.length ? Object.keys(data[0]) : []
+  return `Resumen local:\n- Registros: ${data.length}\n- Columnas: ${cols.length}\n- Pregunta: ${q}`
 }
