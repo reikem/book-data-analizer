@@ -41,9 +41,16 @@ export function ChatInterface() {
   // Ver disponibilidad del backend/ChatGPT una sola vez
   useEffect(() => {
     let mounted = true
+    console.log("[Chat] pingChat: iniciando verificación…")
     pingChat()
-      .then((ok) => mounted && setRemoteAvailable(ok))
-      .catch(() => setRemoteAvailable(false))
+      .then((ok) => {
+        console.log("[Chat] pingChat: resultado =", ok)
+        if (mounted) setRemoteAvailable(ok)
+      })
+      .catch((err) => {
+        console.log("[Chat] pingChat: error =", err)
+        setRemoteAvailable(false)
+      })
     return () => {
       mounted = false
     }
@@ -53,7 +60,7 @@ export function ChatInterface() {
   const filteredData = useMemo(() => {
     if (!data?.length) return []
     if (!selectedCompanies?.length) return data
-    return data.filter((row) => {
+    const out = data.filter((row) => {
       const display = `${row.SociedadNombre ?? ""} - ${row.SociedadCodigo ?? ""}`.trim()
       return (
         (display && selectedCompanies.includes(display)) ||
@@ -61,32 +68,56 @@ export function ChatInterface() {
         (row.SociedadNombre && selectedCompanies.includes(String(row.SociedadNombre)))
       )
     })
+    return out
   }, [data, selectedCompanies])
 
   // Normalizamos la respuesta para que SIEMPRE sea {answer, via}
   async function askWrapper(q: string): Promise<AskResult> {
+    console.log("[Chat] askWrapper → enviando pregunta REMOTA:", {
+      question: q,
+      filteredRows: filteredData.length,
+      selectedCompanies,
+    })
     const res = await askChatGPT(q, filteredData)
-    if (typeof (res as any) === "string") return { answer: String(res), via: "remote" }
-    if (res && typeof (res as any).answer === "string") return res as AskResult
-    return { answer: String(res ?? ""), via: "remote" }
+    console.log("[Chat] askWrapper ← respuesta cruda de askChatGPT:", res)
+
+    if (typeof (res as any) === "string") {
+      const wrapped = { answer: String(res), via: "remote" as const }
+      console.log("[Chat] askWrapper: respuesta envuelta (string → objeto):", wrapped)
+      return wrapped
+    }
+    if (res && typeof (res as any).answer === "string") {
+      console.log("[Chat] askWrapper: respuesta ya normalizada:", res)
+      return res as AskResult
+    }
+    const fallback = { answer: String(res ?? ""), via: "remote" as const }
+    console.log("[Chat] askWrapper: respuesta atípica, fallback normalizado:", fallback)
+    return fallback
   }
 
   const chatMutation = useMutation<AskResult, Error, string>({
     mutationFn: askWrapper,
     onSuccess: ({ answer, via }) => {
+      console.log("[Chat] onSuccess:", { via, answerPreview: answer.slice(0, 120) })
       setMessages((prev) => prev.map((m) => (m.isLoading ? { ...m, answer, via, isLoading: false } : m)))
       incrementChatQuestions()
     },
     onError: (err) => {
       // ⚠️ No cambiamos remoteAvailable aquí: el backend puede estar OK, solo falló esta request (422/401/etc)
-      console.error("askChatGPT error:", err)
+      console.error("[Chat] onError (remoto):", err)
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
-            ? { ...m, answer: makeLocalSummary(m.question, filteredData), via: "local", isLoading: false }
+            ? {
+                ...m,
+                answer: makeLocalSummary(m.question, filteredData),
+                via: "local",
+                isLoading: false,
+              }
             : m,
         ),
       )
+      console.log("[Chat] onError: generado resumen local como fallback.")
     },
   })
 
@@ -94,6 +125,13 @@ export function ChatInterface() {
     e.preventDefault()
     const q = question.trim()
     if (!q || chatQuestions >= 3 || chatMutation.isPending) return
+
+    console.log("[Chat] handleSubmit:", {
+      question: q,
+      mode: remoteAvailable === false ? "local" : remoteAvailable === true ? "remoto" : "verificando/remoto",
+      filteredRows: filteredData.length,
+      selectedCompanies,
+    })
 
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -110,6 +148,7 @@ export function ChatInterface() {
     } else if (remoteAvailable === false) {
       // directo a local (sin mostrar error de conexión)
       const ans = makeLocalSummary(q, filteredData)
+      console.log("[Chat] Modo local directo: respuesta generada localmente:", ans)
       setMessages((prev) =>
         prev.map((m) => (m.id === newMessage.id ? { ...m, answer: ans, via: "local", isLoading: false } : m)),
       )
