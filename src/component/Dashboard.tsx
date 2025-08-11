@@ -456,7 +456,6 @@ export function Dashboard() {
         ),
       },
 
-      // tabla estilo captura (muestra NOMBRE de sociedad)
       {
         id: "table-last10",
         type: "table",
